@@ -20,11 +20,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+
+        // Формируем список участников с иконкой удаления
+        let participantsHTML = '';
+        if (details.participants && details.participants.length > 0) {
+          participantsHTML = `<ul class="participants-list no-bullets">${details.participants.map(p => `
+            <li>
+              <span class="participant-email">${p}</span>
+              <span class="delete-participant" title="Удалить" data-activity="${name}" data-email="${p}">&#128465;</span>
+            </li>`).join('')}</ul>`;
+        } else {
+          participantsHTML = '<ul class="participants-list no-bullets"><li class="no-participants">Нет участников</li></ul>';
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <strong>Participants:</strong>
+            ${participantsHTML}
+          </div>
         `;
 
         activitiesList.appendChild(activityCard);
@@ -34,6 +51,28 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+        // Навешиваем обработчик на иконки удаления
+        activityCard.querySelectorAll('.delete-participant').forEach(icon => {
+          icon.addEventListener('click', async (e) => {
+            const activity = icon.getAttribute('data-activity');
+            const email = icon.getAttribute('data-email');
+            if (confirm(`Удалить участника ${email} из "${activity}"?`)) {
+              try {
+                const resp = await fetch(`/activities/${encodeURIComponent(activity)}/participant?email=${encodeURIComponent(email)}`, {
+                  method: 'DELETE'
+                });
+                const result = await resp.json();
+                if (resp.ok) {
+                  fetchActivities();
+                } else {
+                  alert(result.detail || 'Ошибка при удалении участника');
+                }
+              } catch (err) {
+                alert('Ошибка при удалении участника');
+              }
+            }
+          });
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
@@ -62,6 +101,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+          // Обновить список активностей после успешной регистрации
+          fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
